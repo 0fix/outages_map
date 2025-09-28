@@ -2,14 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Outage Map</title>
+  <title>Outage Map Portugal</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
+    body { font-family: sans-serif; margin: 20px; }
     #map { height: 600px; width: 100%; margin-top: 20px; }
+    select { padding: 8px; font-size: 16px; }
   </style>
 </head>
 <body>
-  <h1>Outage Map</h1>
+  <h1>Outage Map for Portugal</h1>
   <label for="municipality-select">Select Municipality:</label>
   <select id="municipality-select">
     <option value="">-- Choose --</option>
@@ -19,11 +21,12 @@
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
+    const OPENCAGE_API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your actual key
     const municipalities = [
       "Lisboa", "Porto", "Coimbra", "Faro", "Braga", "Setúbal", "Aveiro", "Leiria", "Viseu", "Évora",
       "Beja", "Guarda", "Castelo Branco", "Santarém", "Viana do Castelo", "Vila Real", "Bragança",
       "Mafra", "Sintra", "Oeiras", "Loures", "Cascais", "Almada", "Seixal", "Barreiro", "Moita", "Montijo"
-      // Add more as needed
+      // Add more municipalities as needed
     ];
 
     const select = document.getElementById("municipality-select");
@@ -34,38 +37,54 @@
       select.appendChild(option);
     });
 
-    const map = L.map('map').setView([38.7, -9.2], 8); // Centered on Portugal
+    const map = L.map('map').setView([39.5, -8.0], 7); // Centered on Portugal
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    const geocodeCache = {};
+
+    function geocode(zip, callback) {
+      if (geocodeCache[zip]) {
+        callback(geocodeCache[zip]);
+        return;
+      }
+
+      fetch(`https://api.opencagedata.com/geocode/v1/json?q=${zip}+Portugal&key=${OPENCAGE_API_KEY}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.results.length > 0) {
+            const coords = [data.results[0].geometry.lat, data.results[0].geometry.lng];
+            geocodeCache[zip] = coords;
+            callback(coords);
+          } else {
+            console.warn(`No geocode found for ${zip}`);
+          }
+        })
+        .catch(err => console.error('Geocoding error:', err));
+    }
+
     select.addEventListener("change", () => {
       const municipality = select.value;
+      if (!municipality) return;
+
       fetch(`https://0fix.eu.pythonanywhere.com/outages_map?municipality=${encodeURIComponent(municipality)}`)
         .then(res => res.json())
         .then(data => {
+          // Clear existing markers
           map.eachLayer(layer => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
           });
 
           data.forEach(outage => {
             const zip = outage.zipcode;
-            // Placeholder geocoding: replace with real API call
-            fakeGeocode(zip, coords => {
+            geocode(zip, coords => {
               L.marker(coords).addTo(map)
                 .bindPopup(`<strong>${outage.municipality}</strong><br>Zip: ${zip}`);
             });
           });
         });
     });
-
-    // Fake geocoding for demo purposes
-    function fakeGeocode(zip, callback) {
-      // Replace this with real geocoding logic
-      const lat = 38.9 + Math.random() * 0.2;
-      const lng = -9.3 + Math.random() * 0.2;
-      callback([lat, lng]);
-    }
   </script>
 </body>
 </html>
