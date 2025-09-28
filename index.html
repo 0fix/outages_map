@@ -26,61 +26,73 @@
   <div id="spinner">🔄 Loading outages…</div>
   <div id="map"></div>
 
+  <!-- Load Leaflet -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Load municipality list -->
+  <script src="municipalities.js"></script>
+
+  <!-- Main logic -->
   <script>
-    const municipalities = [/* your full array here */];
+    document.addEventListener("DOMContentLoaded", function () {
+      const select = document.getElementById("municipality-select");
+      const spinner = document.getElementById("spinner");
+      const mapDiv = document.getElementById("map");
 
-    const select = document.getElementById("municipality-select");
-    const spinner = document.getElementById("spinner");
-    const mapDiv = document.getElementById("map");
+      // Populate dropdown
+      municipalities.forEach(m => {
+        const option = document.createElement("option");
+        option.value = m;
+        option.textContent = m;
+        select.appendChild(option);
+      });
 
-    municipalities.forEach(m => {
-      const option = document.createElement("option");
-      option.value = m;
-      option.textContent = m;
-      select.appendChild(option);
-    });
+      // Initialize map
+      const map = L.map('map').setView([39.5, -8.0], 7);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
 
-    const map = L.map('map').setView([39.5, -8.0], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+      // Handle selection
+      select.addEventListener("change", () => {
+        const municipality = select.value;
+        if (!municipality) return;
 
-    select.addEventListener("change", () => {
-      const municipality = select.value;
-      if (!municipality) return;
+        spinner.style.display = "block";
+        mapDiv.style.display = "none";
 
-      spinner.style.display = "block";
-      mapDiv.style.display = "none";
+        fetch(`https://0fix.eu.pythonanywhere.com/outages_map?municipality=${encodeURIComponent(municipality)}`)
+          .then(res => res.json())
+          .then(data => {
+            spinner.style.display = "none";
+            mapDiv.style.display = "block";
 
-      fetch(`https://0fix.eu.pythonanywhere.com/outages_map?municipality=${encodeURIComponent(municipality)}`)
-        .then(res => res.json())
-        .then(data => {
-          spinner.style.display = "none";
-          mapDiv.style.display = "block";
+            // Clear old markers
+            map.eachLayer(layer => {
+              if (layer instanceof L.Marker) map.removeLayer(layer);
+            });
 
-          map.eachLayer(layer => {
-            if (layer instanceof L.Marker) map.removeLayer(layer);
+            const validOutages = data.filter(o => o.lat && o.lng);
+            if (validOutages.length === 0) {
+              alert("No geocoded outages found for " + municipality);
+              return;
+            }
+
+            // Center map on first outage
+            const center = [validOutages[0].lat, validOutages[0].lng];
+            map.setView(center, 13);
+
+            // Add markers
+            validOutages.forEach(outage => {
+              L.marker([outage.lat, outage.lng]).addTo(map)
+                .bindPopup(`<strong>${outage.municipality}</strong><br>Zip: ${outage.zipcode}`);
+            });
+          })
+          .catch(err => {
+            spinner.style.display = "none";
+            console.error("Error fetching outages:", err);
           });
-
-          const validOutages = data.filter(o => o.lat && o.lng);
-          if (validOutages.length === 0) {
-            alert("No geocoded outages found for " + municipality);
-            return;
-          }
-
-          const center = [validOutages[0].lat, validOutages[0].lng];
-          map.setView(center, 13);
-
-          validOutages.forEach(outage => {
-            L.marker([outage.lat, outage.lng]).addTo(map)
-              .bindPopup(`<strong>${outage.municipality}</strong><br>Zip: ${outage.zipcode}`);
-          });
-        })
-        .catch(err => {
-          spinner.style.display = "none";
-          console.error("Error fetching outages:", err);
-        });
+      });
     });
   </script>
 </body>
