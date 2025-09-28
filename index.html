@@ -6,8 +6,14 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body { font-family: sans-serif; margin: 20px; }
-    #map { height: 600px; width: 100%; margin-top: 20px; }
+    #map { height: 600px; width: 100%; margin-top: 20px; display: none; }
     select { padding: 8px; font-size: 16px; width: 300px; }
+    #spinner {
+      margin-top: 20px;
+      display: none;
+      font-size: 18px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -17,6 +23,7 @@
     <option value="">-- Choose --</option>
   </select>
 
+  <div id="spinner">🔄 Loading outages…</div>
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -345,26 +352,16 @@ Vouzela`.split('\n');
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    const spinner = document.getElementById("spinner");
+    const mapDiv = document.getElementById("map");
     const geocodeCache = {};
 
-    function geocode(zip, callback) {
-      if (geocodeCache[zip]) {
-        callback(geocodeCache[zip]);
+    function geocode(query, callback) {
+      if (geocodeCache[query]) {
+        callback(geocodeCache[query]);
         return;
       }
 
-      fetch(`https://api.opencagedata.com/geocode/v1/json?q=${zip}+Portugal&key=${OPENCAGE_API_KEY}`)
+      fetch(`https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(query)}&key=${OPENCAGE_API_KEY}`)
         .then(res => res.json())
         .then(data => {
-          if (data.results.length > 0) {
-            const coords = [data.results[0].geometry.lat, data.results[0].geometry.lng];
-            geocodeCache[zip] = coords;
-            callback(coords);
-          } else {
-            console.warn(`No geocode found for ${zip}`);
-          }
-        })
-        .catch(err => console.error('Geocoding error:', err));
-    }
-
-    select.addEventListener("change", ()
